@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CyberBench 40.0: Dark Nebula</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Open+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        @font-face {
+            font-family: 'Google Sans';
+            src: local('Google Sans'), local('Product Sans'), url('https://fonts.gstatic.com/s/productsans/v9/HYvgU2fE2nRJvZ5JFAumwegdm0LZdjqr5-oayXSOefg.woff2') format('woff2');
+            font-weight: 400;
+        }
+        @font-face {
+            font-family: 'Google Sans';
+            src: local('Google Sans Bold'), local('Product Sans Bold'), url('https://fonts.gstatic.com/s/productsans/v9/HYvgU2fE2nRJvZ5JFAumwegdm0LZdjqr5-oayXSOefg.woff2') format('woff2');
+            font-weight: 700;
+        }
+
+        :root {
+            /* Dark Nebula Palette */
+            --bg-app: #050505;
+            --bg-panel: #121212;
+            --bg-card: #1e1e1e;
+            --border: #333333;
+            
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            
+            /* Purple Accents */
+            --brand-primary: #a855f7; /* Electric Purple */
+            --brand-glow: rgba(168, 85, 247, 0.4);
+            
+            /* Functional Colors */
+            --color-prod: #facc15; /* Yellow */
+            --color-create: #34d399; /* Green */
+            --color-ai: #d8b4fe; /* Light Purple */
+            --color-gpu: #22d3ee; /* Cyan */
+            --color-chaos: #f87171; /* Red */
+        }
+
+        body {
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            font-family: 'Roboto', sans-serif;
+            font-weight: 400;
+            overflow: hidden;
+            user-select: none;
+            /* Subtle purple gradient mesh */
+            background-image: radial-gradient(circle at 15% 50%, rgba(168, 85, 247, 0.08) 0%, transparent 40%),
+                              radial-gradient(circle at 85% 30%, rgba(34, 211, 238, 0.05) 0%, transparent 40%);
+        }
+
+        .font-google { font-family: 'Google Sans', 'Open Sans', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        #render-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.2; pointer-events: none; }
+        canvas#cpu-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+        #gpu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0; transition: opacity 0.5s; display: flex; align-items: center; justify-content: center; }
+        #gpu-overlay canvas { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; box-shadow: 0 0 50px var(--brand-glow); }
+
+        #ui-layer { position: relative; z-index: 10; width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto; }
+        
+        .window-frame { 
+            width: 100%; max-width: 1100px; 
+            background-color: var(--bg-panel); 
+            border: 1px solid var(--border);
+            border-radius: 24px; 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); 
+            padding: 1.5rem; 
+            display: flex; flex-direction: column; gap: 1.5rem; 
+            max-height: 95vh; overflow-y: auto; 
+        }
+
+        .header-chip { 
+            background: rgba(168, 85, 247, 0.1); 
+            color: var(--brand-primary); 
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 500; display: inline-block; white-space: nowrap; 
+        }
+
+        .test-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: var(--bg-card); border-radius: 16px; margin-bottom: 8px; transition: all 0.2s; border: 1px solid transparent; }
+        .test-row:hover { background: #2a2a2a; border-color: var(--brand-primary); }
+        .test-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-right: 16px; background: #333; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); font-weight: 700; }
+
+        .btn-filled { 
+            background: var(--brand-primary); 
+            color: white; 
+            font-family: 'Google Sans', sans-serif; font-weight: 700; font-size: 15px; 
+            padding: 0 32px; height: 56px; border-radius: 28px; transition: 0.2s; 
+            display: inline-flex; align-items: center; justify-content: center; 
+            box-shadow: 0 0 20px var(--brand-glow); letter-spacing: 0.5px; white-space: nowrap; 
+        }
+        .btn-filled:hover { 
+            background: #c084fc; /* Lighter purple */
+            box-shadow: 0 0 40px var(--brand-glow); 
+            transform: translateY(-1px); 
+        }
+        
+        .btn-tonal { 
+            background: #2d2d2d; 
+            color: var(--brand-primary); 
+            border: 1px solid var(--brand-primary);
+            font-family: 'Google Sans', sans-serif; font-weight: 500; font-size: 15px; 
+            padding: 0 24px; height: 48px; border-radius: 24px; transition: 0.2s; 
+            display: inline-flex; align-items: center; justify-content: center; 
+        }
+        .btn-tonal:hover { background: rgba(168, 85, 247, 0.1); }
+
+        .progress-container { height: 8px; background: #333; border-radius: 100px; overflow: hidden; margin-top: 16px; }
+        .progress-bar { height: 100%; background: var(--brand-primary); width: 0%; border-radius: 100px; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px var(--brand-primary); }
+
+        .score-card { background: var(--bg-card); padding: 16px; border-radius: 16px; text-align: center; border: 1px solid #2a2a2a; }
+        .score-val { font-size: 18px; font-weight: 700; color: white; font-family: 'Google Sans', sans-serif; }
+        .score-total { font-size: clamp(40px, 8vw, 80px); font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--brand-primary); font-family: 'Google Sans', sans-serif; text-shadow: 0 0 30px var(--brand-glow); }
+        
+        .label-text { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+        .log-line { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 400; color: #888; padding: 4px 0; border-bottom: 1px solid #222; }
+        .menu-item { border: 1px solid #333; background: var(--bg-card); padding: 1rem; transition: all 0.2s; border-radius: 12px; }
+        .menu-item:hover { background: #252525; border-color: var(--brand-primary); }
+
+        .reason-box { font-size: 11px; color: #aaa; margin-top: 6px; line-height: 1.3; background: #111; padding: 8px; border-radius: 8px; border: 1px solid #333; text-align: left; }
+
+        /* SVG Logo Animation */
+        .cyber-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 8px var(--brand-primary)); }
+        .cyber-logo path { fill: var(--brand-primary); }
+    </style>
+</head>
+<body>
+
+    <div id="viewport-container">
+        <div id="render-layer"><canvas id="cpu-canvas"></canvas></div>
+        <div id="gpu-overlay"></div>
+    </div>
+
+    <div id="ui-layer">
+        <div class="window-frame" id="main-window">
+            <!-- HEADER -->
+            <div class="flex justify-between items-center pb-4 border-b border-gray-800">
+                <div class="flex items-center gap-4">
+                    <!-- Custom C Logo -->
+                    <svg class="cyber-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 10 C28 10 10 28 10 50 C10 72 28 90 50 90 L75 90 L75 75 L50 75 C36 75 25 64 25 50 C25 36 36 25 50 25 L75 25 L75 10 L50 10 Z M80 40 L80 60 L95 50 Z" />
+                    </svg>
+                    <div>
+                        <h1 class="font-google text-2xl md:text-3xl font-bold text-white tracking-tight">CyberBench <span class="text-[var(--brand-primary)]">40.0</span></h1>
+                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-1">DARK NEBULA SUITE</p>
+                    </div>
+                </div>
+                <div class="text-right hidden md:block">
+                    <div class="header-chip shadow-sm" id="sys-model">Scanning...</div>
+                </div>
+            </div>
+
+            <!-- START SCREEN -->
+            <div id="view-start" class="flex flex-col gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-card p-4 rounded-2xl border border-[#333] bg-[#1e1e1e]">
+                        <span class="label-text">CPU Threads</span>
+                        <div class="font-google text-lg md:text-xl font-medium mt-1 text-white" id="spec-cpu">--</div>
+                    </div>
+                    <div class="bg-card p-4 rounded-2xl border border-[#333] bg-[#1e1e1e]">
+                        <span class="label-text">Graphics API</span>
+                        <div class="font-google text-lg md:text-xl font-medium mt-1 truncate text-white" id="spec-api">Detecting...</div>
+                    </div>
+                    <div class="bg-card p-4 rounded-2xl border border-[#333] bg-[#1e1e1e]">
+                        <span class="label-text">OS Platform</span>
+                        <div class="font-google text-lg md:text-xl font-medium mt-1 text-white" id="spec-os">...</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div class="menu-item border-t-4 border-t-[var(--color-prod)]">
+                        <div class="text-[var(--color-prod)] font-bold text-sm mb-1">01. SINGLE-CORE ALU</div>
+                        <p class="text-[10px] text-gray-400">Integer Math & Logic.</p>
+                    </div>
+                    <div class="menu-item border-t-4 border-t-[var(--color-create)]">
+                        <div class="text-[var(--color-create)] font-bold text-sm mb-1">02. RAM BANDWIDTH</div>
+                        <p class="text-[10px] text-gray-400">Throughput & Latency.</p>
+                    </div>
+                    <div class="menu-item border-t-4 border-t-[var(--color-ai)]">
+                        <div class="text-[var(--color-ai)] font-bold text-sm mb-1">03. NEURAL ENGINE</div>
+                        <p class="text-[10px] text-gray-400">Heavy Matrix Ops.</p>
+                    </div>
+                    <div class="menu-item border-t-4 border-t-[var(--color-gpu)]">
+                        <div class="text-[var(--color-gpu)] font-bold text-sm mb-1">04. GRAPHICS 4K</div>
+                        <p class="text-[10px] text-gray-400">Volumetric Shader.</p>
+                    </div>
+                    <div class="menu-item border-t-4 border-t-[var(--color-chaos)]">
+                        <div class="text-[var(--color-chaos)] font-bold text-sm mb-1">05. HIGH STRESS</div>
+                        <p class="text-[10px] text-gray-400">Thermal Throttling.</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center justify-between pt-2 gap-4 border-t border-gray-800 mt-2">
+                    <label class="flex items-center gap-3 cursor-pointer p-3 rounded-full hover:bg-[#2a2a2a] transition select-none w-full md:w-auto justify-center md:justify-start">
+                        <input type="checkbox" id="oc-toggle" class="w-5 h-5 accent-[var(--brand-primary)] bg-gray-700 border-gray-600">
+                        <span class="text-sm font-medium text-gray-300">Enable High Stress Mode</span>
+                    </label>
+                    <button onclick="app.start()" class="btn-filled text-lg shadow-md w-full md:w-auto">START BENCHMARK</button>
+                </div>
+            </div>
+
+            <!-- RUNNING SCREEN -->
+            <div id="view-running" class="hidden flex flex-col h-full justify-center">
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h2 id="run-title" class="text-2xl md:text-4xl font-bold font-google text-[var(--brand-primary)]">Initializing...</h2>
+                        <p id="run-sub" class="text-xs md:text-sm font-medium text-gray-400 mt-1">ALLOCATING RESOURCES</p>
+                    </div>
+                    <div id="run-timer" class="text-2xl md:text-3xl font-bold font-mono text-white">0.00s</div>
+                </div>
+                <div class="progress-container shadow-inner mb-8"><div id="run-bar" class="progress-bar"></div></div>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div class="score-card"><div class="label-text text-[var(--color-prod)] mb-2">ALU</div><div id="live-prod" class="score-val">---</div></div>
+                    <div class="score-card"><div class="label-text text-[var(--color-create)] mb-2">RAM</div><div id="live-create" class="score-val">---</div></div>
+                    <div class="score-card"><div class="label-text text-[var(--color-ai)] mb-2">NPU</div><div id="live-ml" class="score-val">---</div></div>
+                    <div class="score-card"><div class="label-text text-[var(--color-gpu)] mb-2">GPU</div><div id="live-gpu" class="score-val">---</div></div>
+                    <div class="score-card col-span-2 md:col-span-1"><div class="label-text text-[var(--color-chaos)] mb-2">HEAT</div><div id="live-chaos" class="score-val">---</div></div>
+                </div>
+            </div>
+
+            <!-- ANALYSIS SCREEN -->
+            <div id="view-analysis" class="hidden text-center py-8 md:py-16">
+                <div class="w-20 h-20 rounded-full bg-[rgba(168,85,247,0.1)] text-[var(--brand-primary)] text-4xl flex items-center justify-center mx-auto mb-8 animate-pulse border border-[var(--brand-primary)]">✨</div>
+                <div class="text-[var(--brand-primary)] font-bold text-xl md:text-2xl mb-8 tracking-tight font-google">CONSULTING NEURAL ARCHITECT...</div>
+                <div id="analysis-log" class="text-xs font-medium text-gray-400 h-40 overflow-hidden border border-gray-700 p-6 text-left bg-black rounded-2xl shadow-inner font-mono"></div>
+            </div>
+
+            <!-- RESULTS SCREEN -->
+            <div id="view-results" class="hidden flex flex-col">
+                <div class="flex flex-col md:flex-row gap-8 items-start">
+                    <div class="w-full md:w-1/3 text-center md:text-left">
+                        <div class="label-text mb-2">TOTAL SCORE (MAX 5000)</div>
+                        <div id="final-score" class="score-total">0</div>
+                        <div id="final-rank" class="text-xl md:text-2xl font-bold text-[var(--brand-primary)] mt-4 font-google leading-tight">...</div>
+                    </div>
+                    <div class="w-full md:w-2/3 flex flex-col gap-5">
+                        <div class="bg-[#1e1e1e] p-6 rounded-2xl border border-[#333]">
+                            <div class="label-text text-[var(--brand-primary)] mb-2">HARDWARE IDENTITY</div>
+                            <div id="final-device" class="text-xl md:text-2xl font-bold font-google text-white">Unknown</div>
+                            <div id="final-desc" class="mt-3 text-xs md:text-sm font-normal text-gray-400 leading-relaxed">...</div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            <div class="text-center p-2 rounded-xl bg-[#1a1a1a] border border-[#333]"><div class="label-text text-[var(--color-prod)] mb-1">ALU</div><div id="res-prod" class="font-bold text-lg text-white font-google">0</div><div id="reason-prod" class="reason-box">Calc...</div></div>
+                            <div class="text-center p-2 rounded-xl bg-[#1a1a1a] border border-[#333]"><div class="label-text text-[var(--color-create)] mb-1">RAM</div><div id="res-create" class="font-bold text-lg text-white font-google">0</div><div id="reason-create" class="reason-box">Calc...</div></div>
+                            <div class="text-center p-2 rounded-xl bg-[#1a1a1a] border border-[#333]"><div class="label-text text-[var(--color-ai)] mb-1">NPU</div><div id="res-ml" class="font-bold text-lg text-white font-google">0</div><div id="reason-ml" class="reason-box">Calc...</div></div>
+                            <div class="text-center p-2 rounded-xl bg-[#1a1a1a] border border-[#333]"><div class="label-text text-[var(--color-gpu)] mb-1">GPU</div><div id="res-gpu" class="font-bold text-lg text-white font-google">0</div><div id="reason-gpu" class="reason-box">Calc...</div></div>
+                            <div class="text-center p-2 rounded-xl bg-[#1a1a1a] border border-[#333] col-span-2 md:col-span-1"><div class="label-text text-[var(--color-chaos)] mb-1">HEAT</div><div id="res-chaos" class="font-bold text-lg text-white font-google">0</div><div id="reason-chaos" class="reason-box">Calc...</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 md:mt-12 text-center">
+                    <button onclick="location.reload()" class="btn-tonal w-full text-lg shadow-sm hover:shadow-md py-4 hover:bg-purple-900/20">RUN BENCHMARK AGAIN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = "AIzaSyBwa4DrfqKMrfQHJy7F-BwUPUDcmD047Rk"; // INSERT API KEY HERE
+        const CORES = navigator.hardwareConcurrency || 8;
+
+        function getSysInfo() {
+            let gpu = "Unknown GPU", api = "Unknown API";
+            try {
+                const c = document.createElement('canvas'); const gl = c.getContext('webgl'); const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                if(dbg) { gpu = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL); api = gpu.includes("Direct3D")?"DirectX":gpu.includes("Metal")?"Metal":"WebGL"; }
+            } catch(e){}
+            let os = "Unknown"; const ua = navigator.userAgent;
+            if (ua.includes("Win")) os = "Windows"; else if (ua.includes("Mac")) os = (navigator.maxTouchPoints > 0) ? "iPadOS" : "macOS"; else if (ua.includes("Android")) os = "Android"; else if (ua.includes("iPhone")) os = "iOS";
+            return { gpu, api, os, cores: CORES, touch: navigator.maxTouchPoints > 0, resW: window.screen.width, resH: window.screen.height };
+        }
+        const SYS = getSysInfo();
+        document.getElementById('spec-cpu').innerText = `${SYS.cores} Threads`;
+        if (SYS.gpu) document.getElementById('spec-api').innerText = SYS.api;
+        document.getElementById('spec-os').innerText = SYS.os;
+        document.getElementById('sys-model').innerText = `${SYS.os} System`;
+
+        const UI = {
+            start: document.getElementById('view-start'), running: document.getElementById('view-running'), analysis: document.getElementById('view-analysis'), results: document.getElementById('view-results'),
+            title: document.getElementById('run-title'), sub: document.getElementById('run-sub'), timer: document.getElementById('run-timer'), bar: document.getElementById('run-bar'), log: document.getElementById('analysis-log'),
+            scores: { prod: document.getElementById('live-prod'), create: document.getElementById('live-create'), ml: document.getElementById('live-ml'), gpu: document.getElementById('live-gpu'), chaos: document.getElementById('live-chaos') }
+        };
+
+        class CyberBench {
+            constructor() {
+                this.scores = { prod: 0, create: 0, ml: 0, gpu: 0, chaos: 0 };
+                this.overclock = false; this.cpuW = 1920; this.cpuH = 1080;
+                this.ctx = document.getElementById('cpu-canvas').getContext('2d');
+                document.getElementById('cpu-canvas').width = this.cpuW; document.getElementById('cpu-canvas').height = this.cpuH;
+                this.gpuTestRes = "4K (Native)";
+            }
+
+            start() {
+                this.overclock = document.getElementById('oc-toggle').checked;
+                UI.start.classList.add('hidden'); UI.running.classList.remove('hidden');
+                this.startTime = performance.now(); this.runSequence();
+            }
+
+            async runSequence() {
+                await this.runPrimeCore(); 
+                await this.runMemoryLatency();
+                await this.runNeuralSim(); 
+                await this.runGPU();
+                await this.runChaos();
+                this.analyze();
+            }
+
+            // 1. ALU - UNCAPPED DIVISOR
+            runPrimeCore() {
+                return new Promise(resolve => {
+                    this.setPhase("SINGLE-CORE ALU", "Integer Math...", "var(--color-prod)");
+                    const start = performance.now(); const duration = 15000; 
+                    const blob = new Blob([`self.onmessage=function(e){const end=Date.now()+e.data;const size=4*1024*1024;const arr=new Int32Array(size);let ops=0;while(Date.now()<end){const idx=Math.floor(Math.random()*size);arr[idx]=(arr[idx]^Math.random()*255)*3;if(arr[idx]%2===0)ops+=2;else ops+=1;}self.postMessage(ops);}`], {type:'application/javascript'});
+                    this.runWorker(blob, duration, 'prod', 400000000, resolve); 
+                });
+            }
+
+            // 2. RAM - UNCAPPED DIVISOR
+            runMemoryLatency() {
+                return new Promise(resolve => {
+                    this.setPhase("RAM BANDWIDTH", "128MB Random I/O...", "var(--color-create)");
+                    const duration = 20000;
+                    const blob = new Blob([`self.onmessage=function(e){const end=Date.now()+e.data;const size=32*1024*1024;const mem=new Float32Array(size);let ops=0;while(Date.now()<end){for(let i=0;i<1000;i++){const r=Math.floor(Math.random()*size);mem[r]=mem[r]+1.0;}ops++;}self.postMessage(ops);}`], {type:'application/javascript'});
+                    this.runWorker(blob, duration, 'create', 5000, resolve);
+                });
+            }
+
+            // 3. NEURAL - UNCAPPED DIVISOR
+            runNeuralSim() {
+                return new Promise(resolve => {
+                    this.setPhase("NEURAL ENGINE", "128B Param Matrix...", "var(--color-ai)");
+                    const duration = 25000;
+                    const blob = new Blob([`self.onmessage=function(e){const end=Date.now()+e.data;let ops=0;const dim=512;const A=new Float32Array(dim*dim).fill(0.5);while(Date.now()<end){for(let i=0;i<dim;i+=4){A[i]=A[i]*A[i]+0.01;}ops++;}self.postMessage(ops);}`], {type:'application/javascript'});
+                    this.runWorker(blob, duration, 'ml', 500000, resolve);
+                });
+            }
+
+            runWorker(blob, duration, key, factor, resolve) {
+                const url = URL.createObjectURL(blob);
+                const workers = []; let total = 0;
+                for(let i=0; i<CORES; i++) { const w=new Worker(url); w.postMessage(duration); workers.push(w); }
+                workers.forEach(w => w.onmessage = (e) => total += e.data);
+                const start = performance.now();
+                const int = setInterval(() => {
+                    const el = performance.now() - start;
+                    UI.timer.innerText = (el/1000).toFixed(2) + 's';
+                    UI.bar.style.width = `${(el/duration)*100}%`;
+                }, 50);
+                setTimeout(() => {
+                    clearInterval(int); workers.forEach(w => w.terminate());
+                    let score = Math.floor(total / factor);
+                    this.scores[key] = score; UI.scores[key].innerText = score.toLocaleString();
+                    resolve();
+                }, duration + 200);
+            }
+
+            // 4. GPU - UNCAPPED CALCULATION
+            runGPU() {
+                return new Promise(resolve => {
+                    this.setPhase("GRAPHICS 4K", "Volumetric 3840x2160...", "var(--color-gpu)");
+                    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, precision: "highp" });
+                    let w = 3840, h = 2160, penalty = 1.0;
+                    if(renderer.capabilities.maxTextureSize < 4096) { w=1920; h=1080; penalty=0.4; this.gpuTestRes="1080p"; }
+                    renderer.setSize(w, h);
+                    document.getElementById('gpu-overlay').appendChild(renderer.domElement);
+                    const scene = new THREE.Scene(); const cam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+                    const mat = new THREE.ShaderMaterial({
+                        uniforms: { time: {value:0}, resolution: {value: new THREE.Vector2(w,h)} },
+                        fragmentShader: `uniform float time;uniform vec2 resolution;void main(){vec2 uv=gl_FragCoord.xy/resolution.y;float c=0.0;for(int i=0;i<80;i++){c+=0.008*sin(uv.x*15.+time+float(i)*0.1);}gl_FragColor=vec4(vec3(c),1.0);}`
+                    });
+                    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), mat));
+                    const duration = 25000; const start = performance.now(); let frames = 0;
+                    const loop = () => {
+                        if(performance.now()-start > duration) {
+                            renderer.dispose(); document.getElementById('gpu-overlay').innerHTML='';
+                            let raw = frames * (this.overclock ? 30 : 15); 
+                            if(w===3840) raw *= 4;
+                            this.scores.gpu = Math.floor(raw * penalty);
+                            UI.scores.gpu.innerText = this.scores.gpu.toLocaleString();
+                            resolve(); return;
+                        }
+                        mat.uniforms.time.value = (performance.now()-start)/1000;
+                        renderer.render(scene, cam); frames++;
+                        UI.bar.style.width = `${((performance.now()-start)/duration)*100}%`;
+                        UI.timer.innerText = ((performance.now()-start)/1000).toFixed(2)+'s';
+                        requestAnimationFrame(loop);
+                    }
+                    loop();
+                });
+            }
+
+            // 5. Chaos - ADDITIVE SCORE
+            runChaos() {
+                return new Promise(resolve => {
+                    this.setPhase("HIGH STRESS", "Max Load...", "var(--color-chaos)");
+                    const blob = new Blob([`self.onmessage=function(){const e=Date.now()+30000;while(Date.now()<e){Math.random()}}`],{type:'application/javascript'});
+                    const url = URL.createObjectURL(blob);
+                    for(let i=0;i<CORES;i++) new Worker(url).postMessage('go');
+                    const renderer = new THREE.WebGLRenderer({ alpha: true });
+                    renderer.setSize(1920, 1080); document.getElementById('gpu-overlay').appendChild(renderer.domElement);
+                    const scene = new THREE.Scene(); const cam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+                    const mat = new THREE.MeshBasicMaterial({color:0xb3261e});
+                    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1,1), mat));
+                    let frames=0; const start=performance.now(); const dur=30000;
+                    const loop = () => {
+                        if(performance.now()-start > dur) {
+                            renderer.dispose(); document.getElementById('gpu-overlay').innerHTML='';
+                            this.scores.chaos = Math.floor(frames * (this.overclock ? 5 : 3));
+                            UI.scores.chaos.innerText = this.scores.chaos.toLocaleString();
+                            resolve(); return;
+                        }
+                        renderer.render(scene, cam); frames++;
+                        UI.bar.style.width = `${((performance.now()-start)/dur)*100}%`;
+                        UI.timer.innerText = ((performance.now()-start)/1000).toFixed(2)+'s';
+                        requestAnimationFrame(loop);
+                    }
+                    loop();
+                });
+            }
+
+            setPhase(title, sub, color) {
+                UI.title.innerText = title; UI.sub.innerText = sub; 
+                // Support CSS Variables or Hex
+                UI.title.style.color = color.startsWith('var') ? color : color;
+                UI.bar.style.backgroundColor = color.startsWith('var') ? color : color;
+            }
+
+            async analyze() {
+                UI.running.classList.add('hidden'); UI.analysis.classList.remove('hidden');
+                const total = Object.values(this.scores).reduce((a,b)=>a+b,0);
+                const log = UI.log;
+                const steps = ["Verifying Silicon Signature...", "Normalizing to Standard Scale...", "Fetching Device ID..."];
+                for(let i=0; i<steps.length; i++) {
+                    log.innerHTML += `<div class="log-line">> ${steps[i]}</div>`;
+                    await new Promise(r => setTimeout(r, 600));
+                }
+
+                const prompt = `
+                    CyberBench AI Analyst.
+                    
+                    DEVICE: ${SYS.os}, ${SYS.gpu}, ${SYS.cores} Cores, Touch: ${SYS.touch}, Res: ${SYS.resW}x${SYS.resH}.
+                    SCORES (Uncapped Scale. Typical High-End ~100,000):
+                    - ALU: ${this.scores.prod}
+                    - MEM: ${this.scores.create}
+                    - AI: ${this.scores.ml}
+                    - GPU: ${this.scores.gpu}
+                    - STRESS: ${this.scores.chaos}
+                    - TOTAL: ${total}
+
+                    RULES:
+                    - Total > 300,000: Extreme Workstation / Desktop RTX 4090.
+                    - Total ~150,000: Flagship Mobile (S24 Ultra) / High-End Laptop.
+                    - Total < 30,000: Budget.
+
+                    RETURN JSON: { "rank": "Device Name", "desc": "Analysis", "class": "Class", "reasons": ["Reason ALU", "Reason MEM", "Reason AI", "Reason GPU", "Reason Stress"] }
+                `;
+
+                try {
+                    if (!apiKey) throw new Error("No Key");
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+                    });
+                    const data = await response.json();
+                    this.showResults(JSON.parse(data.candidates[0].content.parts[0].text), total);
+                } catch(e) {
+                    this.showResults({ 
+                        rank: "Standard Device", desc: "AI Offline.", class: "Unknown", 
+                        reasons: ["N/A", "N/A", "N/A", "N/A", "N/A"] 
+                    }, total);
+                }
+            }
+
+            showResults(res, total) {
+                UI.analysis.classList.add('hidden'); UI.results.classList.remove('hidden');
+                document.getElementById('final-score').innerText = total.toLocaleString();
+                document.getElementById('final-rank').innerText = res.class;
+                document.getElementById('final-device').innerText = res.rank;
+                document.getElementById('final-desc').innerText = res.desc;
+
+                const setReason = (id, val, reason) => {
+                    document.getElementById(id).innerText = val.toLocaleString();
+                    document.getElementById(id.replace('res', 'reason')).innerText = reason;
+                };
+
+                setReason('res-prod', this.scores.prod, res.reasons[0]);
+                setReason('res-create', this.scores.create, res.reasons[1]);
+                setReason('res-ml', this.scores.ml, res.reasons[2]);
+                setReason('res-gpu', this.scores.gpu, res.reasons[3]);
+                setReason('res-chaos', this.scores.chaos, res.reasons[4]);
+            }
+        }
+
+        const app = new CyberBench();
+    </script>
+</body>
+</html>
